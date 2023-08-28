@@ -57,7 +57,8 @@ func main() {
 
 	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler)
 
-	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
+	// http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
+	http.Handle("/webhook", webhookHandler)
 
 	addr := fmt.Sprintf("%s:%d", config.Server.Address, config.Server.Port)
 	logger.Info().Msgf("Starting server on %s...", addr)
