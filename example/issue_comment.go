@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/go-github/v53/github"
@@ -73,8 +74,19 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return nil
 	}
 
+	// Find command beginning with a slash and followed by a word, may contain dashes (-) and multiple words
+	// Only matches the first slash command
+	pattern := regexp.MustCompile(`^\/\w+(?:-\w+)*`)
+	slash_command := "None"
+	if match := pattern.FindString(body); match != "" {
+		slash_command = match
+		fmt.Println("Slash command found:", match)
+	}
+
 	logger.Debug().Msgf("Echoing comment on %s/%s#%d by %s", repoOwner, repoName, prNum, author)
-	msg := fmt.Sprintf("%s\n%s said\n```\n%s\n```\n", h.preamble, author, body)
+	msg := fmt.Sprintf("%s\n%s said\n```\n%s\n```\nFound the slash command: `%s`\n", h.preamble, author, body, slash_command)
+
+	// Answer with an issue comment
 	prComment := github.IssueComment{
 		Body: &msg,
 	}
