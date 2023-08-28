@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-github/v53/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 )
 
 type PRCommentHandler struct {
@@ -42,10 +41,11 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return errors.Wrap(err, "failed to parse issue comment event payload")
 	}
 
-	if !event.GetIssue().IsPullRequest() {
-		zerolog.Ctx(ctx).Debug().Msg("Issue comment event is not for a pull request")
-		return nil
-	}
+	// Uncomment this if you want to listen only to PR issues
+	// if !event.GetIssue().IsPullRequest() {
+	// 	zerolog.Ctx(ctx).Debug().Msg("Issue comment event is not for a pull request")
+	// 	return nil
+	// }
 
 	repo := event.GetRepo()
 	prNum := event.GetIssue().GetNumber()
