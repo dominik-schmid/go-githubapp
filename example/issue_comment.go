@@ -128,6 +128,52 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New branch ref is: %s", newBranchRef)
 		logger.Debug().Msg(logMsg)
 
+		// Create a new blob for the file content
+		myBlob := github.Blob{
+			Content:  github.String("This is some blob content"),
+			Encoding: github.String("utf-8"),
+		}
+		newBlob, _, err := client.Git.CreateBlob(ctx, repoOwner, repoName, &myBlob)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create new blob")
+			return nil
+		}
+		logMsg = fmt.Sprintf("New blob SHA is: %v", newBlob.GetSHA())
+		logger.Debug().Msg(logMsg)
+
+		entry1 := &github.TreeEntry{
+			Path:    github.String("path/to/file1.txt"),
+			Mode:    github.String("100644"), // Mode for a blob
+			Type:    github.String("blob"),
+			Content: github.String("file content"),
+		}
+
+		entry2 := &github.TreeEntry{
+			Path:    github.String("path/to/file2.txt"),
+			Mode:    github.String("100644"),
+			Type:    github.String("blob"),
+			Content: github.String("another file content"),
+		}
+
+		// Define an array of TreeEntries
+		entries := []*github.TreeEntry{entry1, entry2}
+
+		// logMsg = fmt.Sprintf("Branch SHA is: %v", newBranchRef.Object.GetSHA())
+		// logger.Debug().Msg(logMsg)
+
+		// myTreeEntry := []github.TreeEntry{[
+		// 	SHA:  github.String(newBlob.GetSHA()),
+		// 	Path: github.String("my-new-test-file.md"),]
+		// }
+		// myTreeEntries := github.createTree
+		myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, newBranchRef.Object.GetSHA(), entries)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create new tree")
+			return nil
+		}
+		logMsg = fmt.Sprintf("New tree is: %v", myTree)
+		logger.Debug().Msg(logMsg)
+
 		// // Create new commit
 		// commitDate := github.Timestamp{Time: time.Now()}
 		// commitName := "codetoolz-bot"
