@@ -130,17 +130,17 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Debug().Msg(logMsg)
 
 		// Create a new blob for the file content
-		myBlob := github.Blob{
-			Content:  github.String("This is some blob content"),
-			Encoding: github.String("utf-8"),
-		}
-		newBlob, _, err := client.Git.CreateBlob(ctx, repoOwner, repoName, &myBlob)
-		if err != nil {
-			logger.Error().Err(err).Msg("Failed to create new blob")
-			return nil
-		}
-		logMsg = fmt.Sprintf("New blob SHA is: %v", newBlob.GetSHA())
-		logger.Debug().Msg(logMsg)
+		// myBlob := github.Blob{
+		// 	Content:  github.String("This is some blob content"),
+		// 	Encoding: github.String("utf-8"),
+		// }
+		// newBlob, _, err := client.Git.CreateBlob(ctx, repoOwner, repoName, &myBlob)
+		// if err != nil {
+		// 	logger.Error().Err(err).Msg("Failed to create new blob")
+		// 	return nil
+		// }
+		// logMsg = fmt.Sprintf("New blob SHA is: %v", newBlob.GetSHA())
+		// logger.Debug().Msg(logMsg)
 
 		entry1 := &github.TreeEntry{
 			Path:    github.String("file1.txt"),
@@ -167,7 +167,8 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		// 	Path: github.String("my-new-test-file.md"),]
 		// }
 		// myTreeEntries := github.createTree
-		myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, newBranchRef.Object.GetSHA(), entries)
+		// myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, newBranchRef.Object.GetSHA(), entries)
+		myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, *currentRef.Object.SHA, entries)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new tree")
 			return nil
@@ -188,12 +189,21 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			Email: &commitEmail,
 		}
 
+		latestCommit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, *github.String(*currentRef.Object.SHA))
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to get latest commit")
+			return nil
+		}
+		logMsg = fmt.Sprintf("Latest commit is: %v", latestCommit)
+		logger.Debug().Msg(logMsg)
+
 		// // CommitSHA is obtained when creating a new blob
 		newCommit := github.Commit{
 			SHA:     github.String(myTree.GetSHA()),
 			Author:  &commitAuthor,
 			Message: github.String("This is a commit by bot"),
 			Tree:    myTree,
+			Parents: []*github.Commit{latestCommit},
 			// Parents: [github.String("f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97")],
 		}
 
@@ -205,7 +215,18 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New commit is: %v", myCommit)
 		logger.Debug().Msg(logMsg)
 
+		// Get the reference of the newly created commit
+		// myCommitRef := client.Git.GetRef(ctx, repoOwner, repoName)
+
 		// Note: I have a commit and can view on GitHub but it doesn't belong to any branch or repository (according to GitHub)
+
+		updateRef, _, err := client.Git.UpdateRef(ctx, repoOwner, repoName, newBranchRef, true, *github.String(*myCommit.SHA))
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to update reference")
+			return nil
+		}
+		logMsg = fmt.Sprintf("New reference is: %v", updateRef)
+		logger.Debug().Msg(logMsg)
 
 		// commitSHA := "dac6d4dc213fff95cb432d085cb08fc220e8edcb"
 		// commitMessage := "A commit made by my bot"
