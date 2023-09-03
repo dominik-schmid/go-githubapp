@@ -101,8 +101,6 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		// TODO: Get the default branch using the API
 
 		// Get the reference to the latest commit of the main branch
-		// currentReference := "f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97"
-		// currentURL := "https://api.github.com/repos/cloud-architecting/github-app-test/git/commits/f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97"
 		currentRef, _, err := client.Git.GetRef(ctx, repoOwner, repoName, "heads/main")
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get current reference")
@@ -129,45 +127,24 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New branch ref is: %s", newBranchRef)
 		logger.Debug().Msg(logMsg)
 
-		// Create a new blob for the file content
-		// myBlob := github.Blob{
-		// 	Content:  github.String("This is some blob content"),
-		// 	Encoding: github.String("utf-8"),
-		// }
-		// newBlob, _, err := client.Git.CreateBlob(ctx, repoOwner, repoName, &myBlob)
-		// if err != nil {
-		// 	logger.Error().Err(err).Msg("Failed to create new blob")
-		// 	return nil
-		// }
-		// logMsg = fmt.Sprintf("New blob SHA is: %v", newBlob.GetSHA())
-		// logger.Debug().Msg(logMsg)
-
-		entry1 := &github.TreeEntry{
+		// Define an array of TreeEntries
+		// TODO: Make adding of file contents better?
+		file1 := &github.TreeEntry{
 			Path:    github.String("file1.txt"),
 			Mode:    github.String("100644"), // Mode for a blob
 			Type:    github.String("blob"),
 			Content: github.String("file content"),
 		}
 
-		entry2 := &github.TreeEntry{
+		file2 := &github.TreeEntry{
 			Path:    github.String("file2.txt"),
 			Mode:    github.String("100644"),
 			Type:    github.String("blob"),
 			Content: github.String("another file content"),
 		}
 
-		// Define an array of TreeEntries
-		entries := []*github.TreeEntry{entry1, entry2}
+		entries := []*github.TreeEntry{file1, file2}
 
-		// logMsg = fmt.Sprintf("Branch SHA is: %v", newBranchRef.Object.GetSHA())
-		// logger.Debug().Msg(logMsg)
-
-		// myTreeEntry := []github.TreeEntry{[
-		// 	SHA:  github.String(newBlob.GetSHA()),
-		// 	Path: github.String("my-new-test-file.md"),]
-		// }
-		// myTreeEntries := github.createTree
-		// myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, newBranchRef.Object.GetSHA(), entries)
 		myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, *currentRef.Object.SHA, entries)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new tree")
@@ -176,10 +153,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New tree is: %v", myTree)
 		logger.Debug().Msg(logMsg)
 
-		// logMsg = fmt.Sprintf("Tree SHA is: %v", myTree.GetSHA())
-		// logger.Debug().Msg(logMsg)
-
-		// Create a new commit with tree that has just been created
+		// Create a new commit onto the tree that has just been created
 		commitDate := github.Timestamp{Time: time.Now()}
 		commitName := "codetoolz-bot"
 		commitEmail := "john@example.com"
@@ -189,6 +163,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			Email: &commitEmail,
 		}
 
+		// Get latest commit so it can be reference as parent of the new commit
 		latestCommit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, *github.String(*currentRef.Object.SHA))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get latest commit")
@@ -204,7 +179,6 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			Message: github.String("This is a commit by bot"),
 			Tree:    myTree,
 			Parents: []*github.Commit{latestCommit},
-			// Parents: [github.String("f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97")],
 		}
 
 		myCommit, _, err := client.Git.CreateCommit(ctx, repoOwner, repoName, &newCommit)
@@ -215,11 +189,6 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New commit is: %v", myCommit)
 		logger.Debug().Msg(logMsg)
 
-		// Get the reference of the newly created commit
-		// myCommitRef := client.Git.GetRef(ctx, repoOwner, repoName)
-
-		// Note: I have a commit and can view on GitHub but it doesn't belong to any branch or repository (according to GitHub)
-
 		updateRef, _, err := client.Git.UpdateRef(ctx, repoOwner, repoName, newBranchRef, true, *github.String(*myCommit.SHA))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to update reference")
@@ -227,38 +196,6 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		}
 		logMsg = fmt.Sprintf("New reference is: %v", updateRef)
 		logger.Debug().Msg(logMsg)
-
-		// commitSHA := "dac6d4dc213fff95cb432d085cb08fc220e8edcb"
-		// commitMessage := "A commit made by my bot"
-		// commit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, "f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97")
-		// if err != nil {
-		// 	return nil
-		// }
-		// commitTree := github.Tree{
-		// 	SHA: github.String(commit.GetTree().GetSHA()),
-		// }
-		// // logMsg = fmt.Sprintf("\nnewBranchRef: %s", newBranchRef)
-		// // fmt.Println(logMsg)
-		// // logMsg = fmt.Sprintf("\nnewBranchRef.Object.SHA: %s", newBranchRef.Object.SHA)
-		// // fmt.Println(logMsg)
-		// // logMsg = fmt.Sprintf("\nTree: %s", commitTree)
-		// // fmt.Println(logMsg)
-		// newCommit := github.Commit{
-		// 	SHA:       &commitSHA,
-		// 	Author:    &commitAuthor,
-		// 	Committer: &commitAuthor,
-		// 	Message:   &commitMessage,
-		// 	Tree:      &commitTree,
-		// }
-
-		// commitRef, _, err := client.Git.CreateCommit(ctx, repoOwner, repoName, &newCommit)
-		// if err != nil {
-		// 	logger.Error().Err(err).Msg("Failed to create commit")
-		// 	return nil
-		// }
-		// logMsg = fmt.Sprintf("Commit created: %s", commitRef)
-		// logger.Debug().Msg(logMsg)
-
 	}
 
 	if slash_command == "/testpr" {
