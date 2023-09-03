@@ -6,3 +6,5 @@
 *.iws
 *.ipr
 .idea/
+
+*.pem
