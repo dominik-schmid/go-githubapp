@@ -95,5 +95,25 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Error().Err(err).Msg("Failed to comment on pull request")
 	}
 
+	if slash_command == "/testpr" {
+		title := "First PR"
+		head := "pr-branch"
+		base := "main"
+		prBody := "This is a PR created by a bot"
+		newPRContent := github.NewPullRequest{
+			Title: &title,
+			Head:  &head,
+			Base:  &base,
+			Body:  &prBody,
+		}
+
+		newPR, _, err := client.PullRequests.Create(ctx, repoOwner, repoName, &newPRContent)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create pull request")
+		}
+		logMsg := fmt.Sprintf("Created pull request with ID %v and title %s\n", *newPR.Number, *newPR.Title)
+		logger.Debug().Msg(logMsg)
+	}
+
 	return nil
 }
