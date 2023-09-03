@@ -101,25 +101,22 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		// TODO: Get the default branch using the API
 
 		// Get the reference to the latest commit of the main branch
-		currentRef, _, err := client.Git.GetRef(ctx, repoOwner, repoName, "heads/main")
+		baseBranchRef, _, err := client.Git.GetRef(ctx, repoOwner, repoName, "heads/main")
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get current reference")
 			return nil
 		}
-		logMsg := fmt.Sprintf("Current ref is: %s", currentRef)
+		logMsg := fmt.Sprintf("Current ref is: %s", baseBranchRef)
 		logger.Debug().Msg(logMsg)
 
-		// Create new branch
-		newGitObj := github.GitObject{
-			SHA: currentRef.Object.SHA,
+		// Create new branch with the latest commit SHA of the base branch as basis
+		newBranch := github.Reference{
+			Ref: github.String("refs/heads/my-bot-PR-branch"),
+			Object: &github.GitObject{
+				SHA: baseBranchRef.Object.SHA,
+			},
 		}
-
-		newRef := github.Reference{
-			Ref:    github.String("refs/heads/myNewBranch"),
-			Object: &newGitObj,
-		}
-
-		newBranchRef, _, err := client.Git.CreateRef(ctx, repoOwner, repoName, &newRef)
+		newBranchRef, _, err := client.Git.CreateRef(ctx, repoOwner, repoName, &newBranch)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new branch")
 			return nil
@@ -127,30 +124,28 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New branch ref is: %s", newBranchRef)
 		logger.Debug().Msg(logMsg)
 
-		// Define an array of TreeEntries
-		// TODO: Make adding of file contents better?
+		// Create an array of TreeEntries where files can be added to
+		// TODO: Make adding of file contents better, i.e. by using templates?
 		file1 := &github.TreeEntry{
 			Path:    github.String("file1.txt"),
 			Mode:    github.String("100644"), // Mode for a blob
 			Type:    github.String("blob"),
 			Content: github.String("file content"),
 		}
-
 		file2 := &github.TreeEntry{
 			Path:    github.String("file2.txt"),
 			Mode:    github.String("100644"),
 			Type:    github.String("blob"),
 			Content: github.String("another file content"),
 		}
-
 		entries := []*github.TreeEntry{file1, file2}
 
-		myTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, *currentRef.Object.SHA, entries)
+		newTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, *baseBranchRef.Object.SHA, entries)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new tree")
 			return nil
 		}
-		logMsg = fmt.Sprintf("New tree is: %v", myTree)
+		logMsg = fmt.Sprintf("New tree is: %v", newTree)
 		logger.Debug().Msg(logMsg)
 
 		// Create a new commit onto the tree that has just been created
@@ -163,8 +158,8 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			Email: &commitEmail,
 		}
 
-		// Get latest commit so it can be reference as parent of the new commit
-		latestCommit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, *github.String(*currentRef.Object.SHA))
+		// Get latest commit so it can be referenced as parent of the new commit
+		latestCommit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, *github.String(*baseBranchRef.Object.SHA))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get latest commit")
 			return nil
@@ -174,10 +169,10 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 
 		// // CommitSHA is obtained when creating a new blob
 		newCommit := github.Commit{
-			SHA:     github.String(myTree.GetSHA()),
+			SHA:     github.String(newTree.GetSHA()),
 			Author:  &commitAuthor,
 			Message: github.String("This is a commit by bot"),
-			Tree:    myTree,
+			Tree:    newTree,
 			Parents: []*github.Commit{latestCommit},
 		}
 
