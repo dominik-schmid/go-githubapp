@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v53/github"
 	"github.com/palantir/go-githubapp/githubapp"
@@ -142,14 +143,14 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Debug().Msg(logMsg)
 
 		entry1 := &github.TreeEntry{
-			Path:    github.String("path/to/file1.txt"),
+			Path:    github.String("file1.txt"),
 			Mode:    github.String("100644"), // Mode for a blob
 			Type:    github.String("blob"),
 			Content: github.String("file content"),
 		}
 
 		entry2 := &github.TreeEntry{
-			Path:    github.String("path/to/file2.txt"),
+			Path:    github.String("file2.txt"),
 			Mode:    github.String("100644"),
 			Type:    github.String("blob"),
 			Content: github.String("another file content"),
@@ -174,17 +175,38 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New tree is: %v", myTree)
 		logger.Debug().Msg(logMsg)
 
-		// // Create new commit
-		// commitDate := github.Timestamp{Time: time.Now()}
-		// commitName := "codetoolz-bot"
-		// commitEmail := "john@example.com"
-		// commitAuthor := github.CommitAuthor{
-		// 	Date:  &commitDate,
-		// 	Name:  &commitName,
-		// 	Email: &commitEmail,
-		// }
+		// logMsg = fmt.Sprintf("Tree SHA is: %v", myTree.GetSHA())
+		// logger.Debug().Msg(logMsg)
+
+		// Create a new commit with tree that has just been created
+		commitDate := github.Timestamp{Time: time.Now()}
+		commitName := "codetoolz-bot"
+		commitEmail := "john@example.com"
+		commitAuthor := github.CommitAuthor{
+			Date:  &commitDate,
+			Name:  &commitName,
+			Email: &commitEmail,
+		}
 
 		// // CommitSHA is obtained when creating a new blob
+		newCommit := github.Commit{
+			SHA:     github.String(myTree.GetSHA()),
+			Author:  &commitAuthor,
+			Message: github.String("This is a commit by bot"),
+			Tree:    myTree,
+			// Parents: [github.String("f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97")],
+		}
+
+		myCommit, _, err := client.Git.CreateCommit(ctx, repoOwner, repoName, &newCommit)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create new commit")
+			return nil
+		}
+		logMsg = fmt.Sprintf("New commit is: %v", myCommit)
+		logger.Debug().Msg(logMsg)
+
+		// Note: I have a commit and can view on GitHub but it doesn't belong to any branch or repository (according to GitHub)
+
 		// commitSHA := "dac6d4dc213fff95cb432d085cb08fc220e8edcb"
 		// commitMessage := "A commit made by my bot"
 		// commit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, "f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97")
