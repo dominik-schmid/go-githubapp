@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/google/go-github/v53/github"
 	"github.com/palantir/go-githubapp/githubapp"
@@ -97,10 +96,15 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	}
 
 	if slash_command == "/create-branch" {
-		// Get current reference of main branch
-		// TODO: Get the default branch using the API
+		// Legend:
+		// varNameRef = Variable names ending with "Ref" are reference that are obtained after an API call to GitHub
+		// varNameObj = Variable names ending with "Obj" are objectes, often times with the same "base variable name" as reference
+		// 				which are sent to the GitHub API
+		// Therefore: Obj's most likely will have a follow-up variable with the same name ending in "Ref",
+		// i.e. newBranchObj (object to create) -> newBranchRef (reference of the created object after the API call)
 
 		// Get the reference to the latest commit of the main branch
+		// TODO: Get the default branch using the API, not just using the main branch
 		baseBranchRef, _, err := client.Git.GetRef(ctx, repoOwner, repoName, "heads/main")
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get current reference")
@@ -110,13 +114,13 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Debug().Msg(logMsg)
 
 		// Create new branch with the latest commit SHA of the base branch as basis
-		newBranch := github.Reference{
+		newBranchObj := github.Reference{
 			Ref: github.String("refs/heads/my-bot-PR-branch"),
 			Object: &github.GitObject{
 				SHA: baseBranchRef.Object.SHA,
 			},
 		}
-		newBranchRef, _, err := client.Git.CreateRef(ctx, repoOwner, repoName, &newBranch)
+		newBranchRef, _, err := client.Git.CreateRef(ctx, repoOwner, repoName, &newBranchObj)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new branch")
 			return nil
@@ -124,7 +128,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logMsg = fmt.Sprintf("New branch ref is: %s", newBranchRef)
 		logger.Debug().Msg(logMsg)
 
-		// Create an array of TreeEntries where files can be added to
+		// Create a new tree where files can be added to with an array of TreeEntries
 		// TODO: Make adding of file contents better, i.e. by using templates?
 		file1 := &github.TreeEntry{
 			Path:    github.String("file1.txt"),
@@ -139,52 +143,41 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			Content: github.String("another file content"),
 		}
 		entries := []*github.TreeEntry{file1, file2}
-
-		newTree, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, *baseBranchRef.Object.SHA, entries)
+		newTreeRef, _, err := client.Git.CreateTree(ctx, repoOwner, repoName, *baseBranchRef.Object.SHA, entries)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new tree")
 			return nil
 		}
-		logMsg = fmt.Sprintf("New tree is: %v", newTree)
+		logMsg = fmt.Sprintf("New tree is: %v", newTreeRef)
 		logger.Debug().Msg(logMsg)
 
 		// Create a new commit onto the tree that has just been created
-		commitDate := github.Timestamp{Time: time.Now()}
-		commitName := "codetoolz-bot"
-		commitEmail := "john@example.com"
-		commitAuthor := github.CommitAuthor{
-			Date:  &commitDate,
-			Name:  &commitName,
-			Email: &commitEmail,
-		}
-
 		// Get latest commit so it can be referenced as parent of the new commit
-		latestCommit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, *github.String(*baseBranchRef.Object.SHA))
+		latestCommitRef, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, *github.String(*baseBranchRef.Object.SHA))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get latest commit")
 			return nil
 		}
-		logMsg = fmt.Sprintf("Latest commit is: %v", latestCommit)
+		logMsg = fmt.Sprintf("Latest commit is: %v", latestCommitRef)
 		logger.Debug().Msg(logMsg)
 
-		// // CommitSHA is obtained when creating a new blob
-		newCommit := github.Commit{
-			SHA:     github.String(newTree.GetSHA()),
-			Author:  &commitAuthor,
+		// Create a commit by committing the previously create tree
+		newCommitObj := github.Commit{
+			SHA:     github.String(newTreeRef.GetSHA()),
 			Message: github.String("This is a commit by bot"),
-			Tree:    newTree,
-			Parents: []*github.Commit{latestCommit},
+			Tree:    newTreeRef,
+			Parents: []*github.Commit{latestCommitRef},
 		}
-
-		myCommit, _, err := client.Git.CreateCommit(ctx, repoOwner, repoName, &newCommit)
+		newCommitRef, _, err := client.Git.CreateCommit(ctx, repoOwner, repoName, &newCommitObj)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create new commit")
 			return nil
 		}
-		logMsg = fmt.Sprintf("New commit is: %v", myCommit)
+		logMsg = fmt.Sprintf("New commit is: %v", newCommitRef)
 		logger.Debug().Msg(logMsg)
 
-		updateRef, _, err := client.Git.UpdateRef(ctx, repoOwner, repoName, newBranchRef, true, *github.String(*myCommit.SHA))
+		// Update HEAD to point to the currently created commit
+		updateRef, _, err := client.Git.UpdateRef(ctx, repoOwner, repoName, newBranchRef, true, *github.String(*newCommitRef.SHA))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to update reference")
 			return nil
