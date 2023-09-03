@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v53/github"
 	"github.com/palantir/go-githubapp/githubapp"
@@ -134,6 +135,49 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		}
 		logMsg = fmt.Sprintf("New branch ref is: %s", newBranchRef)
 		logger.Debug().Msg(logMsg)
+
+		// Create new commit
+		commitDate := github.Timestamp{Time: time.Now()}
+		commitName := "codetoolz-bot"
+		commitEmail := "john@example.com"
+		commitAuthor := github.CommitAuthor{
+			Date:  &commitDate,
+			Name:  &commitName,
+			Email: &commitEmail,
+		}
+
+		// CommitSHA is obtained when creating a new blob
+		commitSHA := "dac6d4dc213fff95cb432d085cb08fc220e8edcb"
+		commitMessage := "A commit made by my bot"
+		commit, _, err := client.Git.GetCommit(ctx, repoOwner, repoName, "f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97")
+		if err != nil {
+			return nil
+		}
+		commitTree := github.Tree{
+			SHA: github.String(commit.GetTree().GetSHA()),
+		}
+		// logMsg = fmt.Sprintf("\nnewBranchRef: %s", newBranchRef)
+		// fmt.Println(logMsg)
+		// logMsg = fmt.Sprintf("\nnewBranchRef.Object.SHA: %s", newBranchRef.Object.SHA)
+		// fmt.Println(logMsg)
+		// logMsg = fmt.Sprintf("\nTree: %s", commitTree)
+		// fmt.Println(logMsg)
+		newCommit := github.Commit{
+			SHA:       &commitSHA,
+			Author:    &commitAuthor,
+			Committer: &commitAuthor,
+			Message:   &commitMessage,
+			Tree:      &commitTree,
+		}
+
+		commitRef, _, err := client.Git.CreateCommit(ctx, repoOwner, repoName, &newCommit)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create commit")
+			return nil
+		}
+		logMsg = fmt.Sprintf("Commit created: %s", commitRef)
+		logger.Debug().Msg(logMsg)
+
 	}
 
 	if slash_command == "/testpr" {
