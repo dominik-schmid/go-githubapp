@@ -112,20 +112,13 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Debug().Msg(logMsg)
 
 		// Create new branch
-		gitObjType := "commit"
 		newGitObj := github.GitObject{
-			Type: &gitObjType,
-			SHA:  currentRef.Object.SHA,
+			SHA: currentRef.Object.SHA,
 		}
 
-		newRefName := "refs/heads/myNewBranch"
-		dummyURL := ""
-		dummyNodeID := ""
 		newRef := github.Reference{
-			Ref:    &newRefName,
-			URL:    &dummyURL,
+			Ref:    github.String("refs/heads/myNewBranch"),
 			Object: &newGitObj,
-			NodeID: &dummyNodeID,
 		}
 
 		newBranchRef, _, err := client.Git.CreateRef(ctx, repoOwner, repoName, &newRef)
