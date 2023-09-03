@@ -187,22 +187,36 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	}
 
 	if slash_command == "/create-pr" {
-		title := "First PR"
-		head := "pr-branch"
+		title := "PR created by bot"
+		head := "my-bot-PR-branch"
 		base := "main"
-		prBody := "This is a PR created by a bot"
-		newPRContent := github.NewPullRequest{
+		prBody := "Please, merge the content of this PR :rocket:"
+
+		newPRObj := github.NewPullRequest{
 			Title: &title,
 			Head:  &head,
 			Base:  &base,
 			Body:  &prBody,
 		}
 
-		newPR, _, err := client.PullRequests.Create(ctx, repoOwner, repoName, &newPRContent)
+		newPRRef, _, err := client.PullRequests.Create(ctx, repoOwner, repoName, &newPRObj)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create pull request")
+			return nil
 		}
-		logMsg := fmt.Sprintf("Created pull request with ID %v and title %s\n", *newPR.Number, *newPR.Title)
+		logMsg := fmt.Sprintf("Created pull request with ID %v and title %s", *newPRRef.Number, *newPRRef.Title)
+		logger.Debug().Msg(logMsg)
+
+		// Post the link to the PR in the comments
+		msg := fmt.Sprintf("The PR has been created, [click here to check it](%s) :eyes:", newPRRef.GetHTMLURL())
+		prCommentObj := github.IssueComment{
+			Body: &msg,
+		}
+
+		if _, _, err := client.Issues.CreateComment(ctx, repoOwner, repoName, prNum, &prCommentObj); err != nil {
+			logger.Error().Err(err).Msg("Failed to comment on pull request")
+		}
+		logMsg = fmt.Sprintf("Commit containing PR link has been created. Link to PR: %s", newPRRef.GetHTMLURL())
 		logger.Debug().Msg(logMsg)
 	}
 
