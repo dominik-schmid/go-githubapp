@@ -198,7 +198,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Debug().Msg(logMsg)
 	}
 
-	if slash_command == "/testpr" {
+	if slash_command == "/create-pr" {
 		title := "First PR"
 		head := "pr-branch"
 		base := "main"
