@@ -95,6 +95,47 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		logger.Error().Err(err).Msg("Failed to comment on pull request")
 	}
 
+	if slash_command == "/create-branch" {
+		// Get current reference of main branch
+		// TODO: Get the default branch using the API
+
+		// Get the reference to the latest commit of the main branch
+		// currentReference := "f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97"
+		// currentURL := "https://api.github.com/repos/cloud-architecting/github-app-test/git/commits/f704106dedc914b1eb0c3ee1a5e4a7f8003e1d97"
+		currentRef, _, err := client.Git.GetRef(ctx, repoOwner, repoName, "heads/main")
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to get current reference")
+			return nil
+		}
+		logMsg := fmt.Sprintf("Current ref is: %s", currentRef)
+		logger.Debug().Msg(logMsg)
+
+		// Create new branch
+		gitObjType := "commit"
+		newGitObj := github.GitObject{
+			Type: &gitObjType,
+			SHA:  currentRef.Object.SHA,
+		}
+
+		newRefName := "refs/heads/myNewBranch"
+		dummyURL := ""
+		dummyNodeID := ""
+		newRef := github.Reference{
+			Ref:    &newRefName,
+			URL:    &dummyURL,
+			Object: &newGitObj,
+			NodeID: &dummyNodeID,
+		}
+
+		newBranchRef, _, err := client.Git.CreateRef(ctx, repoOwner, repoName, &newRef)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create new branch")
+			return nil
+		}
+		logMsg = fmt.Sprintf("New branch ref is: %s", newBranchRef)
+		logger.Debug().Msg(logMsg)
+	}
+
 	if slash_command == "/testpr" {
 		title := "First PR"
 		head := "pr-branch"
